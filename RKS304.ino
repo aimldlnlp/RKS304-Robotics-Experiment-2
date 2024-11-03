@@ -1,4 +1,5 @@
 // #define button 10
+#include <Arduino_FreeRTOS.h>
 
 // Motor A Left
 int pwmA = 9;
@@ -17,13 +18,16 @@ int MotorSpeed2 = 0;
 // Nilai Error
 int errorValue = 0;
 
-int sensor[6] = { A5, A4, A3, A2, A1, A0 };                 // Pin Sensor
+// int sensor[6] = { A5, A4, A3, A2, A1, A0 };                 // Pin Sensor
+int sensor[6] = { A5, A4, A3, A2, A1, A0 };  // Pin Sensor
+
 int sensorMin[6] = { 1023, 1023, 1023, 1023, 1023, 1023 };  // Nilai Min awal
 int sensorMax[6] = { 0, 0, 0, 0, 0, 0 };                    // Nilai Maks awal
 int averageSensor[6] = { 0, 0, 0, 0, 0, 0 };                // Nilai rata-rata
 int riilSensor[6] = { 0, 0, 0, 0, 0, 0 };                   // Nilai riil sensor
 int outputSensor[6] = { 0, 0, 0, 0, 0, 0 };
-int calibrateButton = 0;
+// int calibrateButton = 0;
+void readSensors();
 
 //  Sensor Array   Error Value
 //  0 0 0 0 0 1         -5
@@ -32,8 +36,8 @@ int calibrateButton = 0;
 //  0 0 0 1 1 0         -2
 //  0 0 0 1 0 0          1
 //  0 0 1 1 0 0          0
-//  0 1 1 0 0 0          1
-//  0 0 1 0 0 0          2
+//  0 0 1 0 0 0          1
+//  0 1 1 0 0 0          2
 //  0 1 0 0 0 0          3
 //  1 1 0 0 0 0          4
 //  1 0 0 0 0 0          5
@@ -41,23 +45,23 @@ int calibrateButton = 0;
 
 // Function
 void speed(int a, int b) {
-  int spda = (a / 100 * 255);
-  int spdb = (b / 100 * 255);
+  // int spda = (a / 100 * 255);
+  // int spdb = (b / 100 * 255);
   analogWrite(pwmA, a);
   analogWrite(pwmB, b);
 };
 
 void maju() {
-  digitalWrite(in1A, LOW);
-  digitalWrite(in2A, HIGH);
+  digitalWrite(in1A, HIGH);
+  digitalWrite(in2A, LOW);
   digitalWrite(in1B, HIGH);
   digitalWrite(in2B, LOW);
   speed(70, 70);
 };
 
 void maju(int a, int b) {
-  digitalWrite(in1A, LOW);
-  digitalWrite(in2A, HIGH);
+  digitalWrite(in1A, HIGH);
+  digitalWrite(in2A, LOW);
   digitalWrite(in1B, HIGH);
   digitalWrite(in2B, LOW);
   speed(a, b);
@@ -131,7 +135,7 @@ void setup() {
 
   // Hitung rata-rata sensor
   for (int i = 0; i < 6; i++) {
-    averageSensor[i] = (sensorMax[i] + sensorMin[i]) / 2;
+    averageSensor[i] = (sensorMax[i] + sensorMin[i]) * 0.5;
   }
 
   // Tampilkan nilai rata-rata sensor
@@ -150,74 +154,63 @@ void setup() {
 }
 
 void loop() {
-  for (int i = 0; i < 6; i++) {
-    riilSensor[i] = analogRead(sensor[i]);
-  }
-
-  for (int i = 0; i < 6; i++) {
-    if (riilSensor[i] >= (averageSensor[i])) {
-      outputSensor[i] = 0;
-    }
-
-    if (riilSensor[i] < (averageSensor[i])) {
-      outputSensor[i] = 1;
-    }
-  }
-
-  for (int i = 0; i < 6; i++) {
-    if (i < 5) {
-      Serial.print(outputSensor[i]);
-      Serial.print("\t");
-    } else {
-      Serial.println(outputSensor[i]);
-    }
-  }
-
-  // for (int i = 0; i < 6; i++) {
-  //   if (i < 5) {
-  //     Serial.print(riilSensor[i]);
-  //     Serial.print("\t");
-  //   } else {
-  //     Serial.println(riilSensor[i]);
-  //   }
-  // }
-
-  // Tentukan Nilai Error
+  readSensors();
   errorValue = detectLine();
-
   if (errorValue == 0) {
-    maju(255, 255);
-    Serial.println("Majuuuuuu");
+    maju(40, 40);
+    // Serial.println("Majuuuuuu");
   } else if (errorValue == 1) {
-    maju(255, 210);
-    Serial.println("kanan Dikit");
+    maju(40, 40 - 15 * 1);
+    // Serial.println("kanan Dikit");
   } else if (errorValue == 2 || errorValue == 3) {
-    maju(255, 220);
-    Serial.println("kanan");
-  } else if (errorValue == 4) {
-    maju(220, 0);
-    Serial.println("kanan bgt");
-  } else if (errorValue == 5) {
-    maju(255, 0);
-    Serial.println("kanan bgt");
+    maju(40, 40 - 15 * 2);
+    // Serial.println("kanan");
   } else if (errorValue == -1) {
-    maju(220, 250);
-    Serial.println("kiri Dikit");
+    maju(40 - 15 * 1, 40);
+    // Serial.println("kiri Dikit");
   } else if (errorValue == -2 || errorValue == -3) {
-    maju(210, 255);
-    Serial.println("kiri");
-  } else if (errorValue == -4) {
-    maju(0, 220);
-    Serial.println("kiri banyakk");
-  } else if (errorValue == -5) {
-    maju(0, 255);
-    Serial.println("kiri banyakk");
-  } else {
-    maju(50,50);
-    // stop();
-    Serial.println("Berhenti");
+    maju(40 - 15 * 2, 40);
+    // Serial.println("kiri");
   }
+  if (errorValue == 4) {
+    // maju(5, 5);
+    // while (true) {
+    // readSensors();
+    maju(150, 0);
+    // if (errorValue != 4 or errorValue != 5) {
+    //   break;
+    // }
+    // }
+    // Serial.println("kanan bgt");
+  } else if (errorValue == 5) {
+    maju(150, 0);
+  }
+
+  // Serial.println("kanan bgt");
+  if (errorValue == -4) {
+    // maju(5, 5);
+    // while (true) {
+    //   readSensors();
+    maju(0, 150);
+    // if (errorValue != 4 or errorValue != 5) {
+    //   break;
+    // }
+  }
+  else if (errorValue == -5) {
+    maju(0, 200);
+  }
+  // Serial.println("kanan bgt");
 }
+// else if (errorValue == -5) {
+//   maju(0, 200);
+//   // Serial.println("kiri banyakk");
+// }
+// else {
+//   maju(20, 30);
+//   // stop();
+//   // Serial.println("Berhenti");
+// }
+
 
 //  Sensor Array   Error Value
 //  0 0 0 0 0 1         -5
@@ -233,30 +226,66 @@ void loop() {
 //  1 0 0 0 0 0          5
 //  0 0 0 0 0 0          Error
 
-int detectLine() {
-  if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 0)) {
-    return -5;  //  0 0 0 0 0 1   Error Value = -5
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 0) && (outputSensor[5] == 0)) {
-    return -4;  //  0 0 0 0 1 1   Error Value = -4
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 0) && (outputSensor[5] == 1)) {
-    return -3;  //  0 0 0 0 1 0   Error Value = -3
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 0) && (outputSensor[4] == 0) && (outputSensor[5] == 1)) {
-    return -2;  //  0 0 0 1 1 0   Error Value = -2
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 0) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
-    return -1;  //  0 0 0 1 0 0   Error Value = -1
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 0) && (outputSensor[3] == 0) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
-    return 0;  //  110011  Error Value = 0
-  } else if ((outputSensor[0] == 0) && (outputSensor[1] == 0) && (outputSensor[2] == 0) && (outputSensor[3] == 0) && (outputSensor[4] == 0) && (outputSensor[5] == 0)) {
-    return 1;  //  0 1 1 0 0 0          1
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 0) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
-    return 2;  //  0 0 1 0 0 0          2
-  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 0) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
-    return 3;  //  0 1 0 0 0 0          3
-  } else if ((outputSensor[0] == 0) && (outputSensor[1] == 0) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
-    return 4;  //  1 1 0 0 0 0          4
-  } else if ((outputSensor[0] == 0) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
-    return 5;  //  1 0 0 0 0 0          5
-  } else {
-    return 10;  // Stop
+void readSensors() {
+  delay(12);
+  for (int i = 0; i < 6; i++) {
+    riilSensor[i] = analogRead(sensor[i]);
   }
+
+  for (int i = 0; i < 6; i++) {
+    if (riilSensor[i] >= (averageSensor[i])) {
+      outputSensor[i] = 0;
+    } else if (riilSensor[i] < (averageSensor[i])) {
+      outputSensor[i] = 1;
+    }
+  }
+
+  // for (int i = 0; i < 6; i++) {
+  //   if (i < 5) {
+  //     // Serial.print(outputSensor[i]);
+  //     // Serial.print("\t");
+  //   } else {
+  //     // Serial.println(outputSensor[i]);
+  //   }
+  // }
+
+  // for (int i = 0; i < 6; i++) {
+  //   if (i < 5) {
+  //     Serial.print(riilSensor[i]);
+  //     Serial.print("\t");
+  //   } else {
+  //     Serial.println(riilSensor[i]);
+  //   }
+  // }
+
+  // Tentukan Nilai Error
+}
+
+int detectLine() {
+  if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 0) && (outputSensor[3] == 0) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return 0;  //  1 1 0 0 1 1  Error Value = 0
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 0) && (outputSensor[5] == 1)) {
+    return -3;  //  1 1 1 1 0 1   Error Value = -3
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 0) && (outputSensor[4] == 0) && (outputSensor[5] == 1)) {
+    return -2;  //  1 1 1 0 0 1   Error Value = -2
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 0) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return -1;  //  1 1 1 0 1 1   Error Value = -1
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 0) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return 1;  //  1 1 0 1 1 1          1
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 0) && (outputSensor[2] == 0) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return 2;  //  1 0 0 1 1 1          2
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 0) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return 3;  //  1 0 1 1 1 1          3
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 0) && (outputSensor[5] == 0)) {
+    return -4;  //  1 1 1 1 0 0   Error Value = -4
+  } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 0)) {
+    return -5;  //  1 1 1 1 1 0   Error Value = -5
+  } else if ((outputSensor[0] == 0) && (outputSensor[1] == 0) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return 4;  //  0 0 1 1 1 1          4
+  } else if ((outputSensor[0] == 0) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
+    return 5;  //  0 1 1 1 1 1          5
+  }
+  // else {
+  //   return 10;  // Stop
+  // }
 }
