@@ -1,33 +1,55 @@
-// #define button 10
-#include <Arduino_FreeRTOS.h>
+#include <Servo.h>
 
-// Motor A Left
-int pwmA = 9;
-int in1A = 7;
-int in2A = 8;
+Servo lifting;
 
-// Motor B Right
-int pwmB = 10;
-int in1B = 11;
-int in2B = 12;
+// Left Motor (Motor A) pin definitions
+#define pwmA 9  // PWM speed control pin for left motor
+#define in1A 8  // Direction control pin 1 for left motor
+#define in2A 7  // Direction control pin 2 for left motor
 
-// MotorSpeed
-int MotorSpeed1 = 0;
-int MotorSpeed2 = 0;
+// Right Motor (Motor B) pin definitions
+#define pwmB 10  // PWM speed control pin for right motor
+#define in1B 12  // Direction control pin 1 for right motor
+#define in2B 11  // Direction control pin 2 for right motor
 
-// Nilai Error
-int errorValue = 0;
+// Motor speed variables
+int MotorSpeed1 = 0;  // Current speed for motor 1
+int MotorSpeed2 = 0;  // Current speed for motor 2
 
-// int sensor[6] = { A5, A4, A3, A2, A1, A0 };                 // Pin Sensor
-int sensor[6] = { A5, A4, A3, A2, A1, A0 };  // Pin Sensor
+// Servo motor pin definition
+#define servoPin 5  // Control pin for servo motor
 
-int sensorMin[6] = { 1023, 1023, 1023, 1023, 1023, 1023 };  // Nilai Min awal
-int sensorMax[6] = { 0, 0, 0, 0, 0, 0 };                    // Nilai Maks awal
-int averageSensor[6] = { 0, 0, 0, 0, 0, 0 };                // Nilai rata-rata
-int riilSensor[6] = { 0, 0, 0, 0, 0, 0 };                   // Nilai riil sensor
-int outputSensor[6] = { 0, 0, 0, 0, 0, 0 };
-// int calibrateButton = 0;
-void readSensors();
+// Ultrasonic sensor pins and variables
+#define trigPin 3    // Trigger pin for ultrasonic sensor
+#define echoPin 2    // Echo pin for ultrasonic sensor
+float timing = 0.0;  // Store pulse duration
+float distance;      // Store calculated distance
+
+// Line following parameters
+int baseSpeed = 50;  // Base motor speed for straight line movement
+
+// PD (Proportional-Derivative) Controller Variables
+int Kp = 15;                 // Proportional gain - controls immediate response to error
+float Kd = 0.1;              // Derivative gain - reduces oscillation
+int lastError = 0;           // Stores previous error for derivative calculation
+int derivative = 0;          // Stores rate of change of error
+unsigned long lastTime = 0;  // Timestamp for derivative calculation
+int motorSpeedAdjust = 0;    // Value to adjust motor speeds for correction
+
+bool detect = false;  // Detection flag
+
+// Error tracking
+int errorValue = 0;  // Current error value for PD control
+
+// Line sensor array setup
+int sensor[6] = { A5, A4, A3, A2, A1, A0 };  // Analog pins for line sensors
+
+// Calibration arrays for line sensors
+int sensorMin[6] = { 1023, 1023, 1023, 1023, 1023, 1023 };  // Minimum values (initialized high)
+int sensorMax[6] = { 0, 0, 0, 0, 0, 0 };                    // Maximum values (initialized low)
+int averageSensor[6] = { 0, 0, 0, 0, 0, 0 };                // Average values for calibration
+int riilSensor[6] = { 0, 0, 0, 0, 0, 0 };                   // Raw sensor readings
+int outputSensor[6] = { 0, 0, 0, 0, 0, 0 };                 // Processed sensor outputs
 
 //  Sensor Array   Error Value
 //  0 0 0 0 0 1         -5
@@ -43,110 +65,104 @@ void readSensors();
 //  1 0 0 0 0 0          5
 //  0 0 0 0 0 0          Error
 
-// Function
-void speed(int a, int b) {
-  // int spda = (a / 100 * 255);
+// Controls the speed of both motors using PWM
+void Speed(int a, int b) {
+  // Commented out original percentage calculation
+  // int spda = (a / 100 * 255);  // Convert percentage to PWM value (0-255)
   // int spdb = (b / 100 * 255);
-  analogWrite(pwmA, a);
-  analogWrite(pwmB, b);
-};
 
-void maju() {
+  // Ensure speed values are within valid PWM range (0-255)
+  a = constrain(a, 0, 255);
+  b = constrain(b, 0, 255);
+
+  // Apply PWM signals to control motor speeds
+  analogWrite(pwmA, a);  // Set speed for motor A
+  analogWrite(pwmB, b);  // Set speed for motor B
+}
+
+// Makes the robot move forward at specified speeds
+void Forward(int a, int b) {
+  // Set motor A direction pins for forward motion
   digitalWrite(in1A, HIGH);
   digitalWrite(in2A, LOW);
+
+  // Set motor B direction pins for forward motion
   digitalWrite(in1B, HIGH);
   digitalWrite(in2B, LOW);
-  speed(70, 70);
-};
 
-void maju(int a, int b) {
-  digitalWrite(in1A, HIGH);
-  digitalWrite(in2A, LOW);
-  digitalWrite(in1B, HIGH);
-  digitalWrite(in2B, LOW);
-  speed(a, b);
-};
+  Speed(a, b);  // Apply the specified speeds
+}
 
-void mundur() {
+// Stops both motors
+void Stop() {
+  // Set all direction pins to LOW to stop motors
   digitalWrite(in1A, LOW);
   digitalWrite(in2A, LOW);
   digitalWrite(in1B, LOW);
   digitalWrite(in2B, LOW);
-  speed(70, 70);
-};
 
-void stop() {
-  digitalWrite(in1A, LOW);
-  digitalWrite(in2A, LOW);
-  digitalWrite(in1B, LOW);
-  digitalWrite(in2B, LOW);
-  speed(0, 0);
-};
-
-void kanan(int a, int b) {
-  digitalWrite(in1A, LOW);
-  digitalWrite(in2A, LOW);
-  digitalWrite(in1B, HIGH);
-  digitalWrite(in2B, LOW);
-  speed(a, b);
-};
-
-void kiri(int a, int b) {
-  digitalWrite(in1A, LOW);
-  digitalWrite(in2A, HIGH);
-  digitalWrite(in1B, LOW);
-  digitalWrite(in2B, LOW);
-  speed(a, b);
-};
+  Speed(0, 0);  // Set speed to zero for both motors
+}
 
 void setup() {
   Serial.begin(9600);
-  // pinMode(button, INPUT_PULLUP);
+
+  // Setup servo motor for lifting mechanism
+  lifting.attach(servoPin);
+  // lifting.writeMicroseconds(1500);
+
+  // Setup ultrasonic sensor pins
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  // Setup dual motor control pins
+  // Motor A
   pinMode(pwmA, OUTPUT);
-  pinMode(pwmB, OUTPUT);
   pinMode(in1A, OUTPUT);
   pinMode(in2A, OUTPUT);
+
+  // Motor B
+  pinMode(pwmB, OUTPUT);
   pinMode(in1B, OUTPUT);
   pinMode(in2B, OUTPUT);
-  // PROSES KALIBRASI
+
+  // Calibration process
   int sensorValue[6] = { 0, 0, 0, 0, 0, 0 };
 
-  // Tanda Mulai Kalibrasi
-  Serial.println("Mulai Kalibrasi!");
+  // Calibration start sign
+  Serial.println("Calibrating...");
 
-  // loop untuk mencari nilai maks dan min dari sensor selama 5 detik
-  unsigned long waktuMulaiKalibrasi = millis();
-  while (millis() - waktuMulaiKalibrasi < 5000) {
-    // Serial.println("Baca Sensor");
+  unsigned long timeStartCalibration = millis();
+  while (millis() - timeStartCalibration < 5000) {
     for (int i = 0; i < 6; i++) {
       sensorValue[i] = analogRead(sensor[i]);
 
-      // Cari Nilai Maks
+      // Find max value
       if (sensorValue[i] > sensorMax[i]) {
         sensorMax[i] = sensorValue[i];
       }
 
-      // Cari Nilai Min
+      // Find min value
       if (sensorValue[i] < sensorMin[i]) {
         sensorMin[i] = sensorValue[i];
       }
     }
   }
 
-  // Hitung rata-rata sensor
+  // Calculate the sensor average
   for (int i = 0; i < 6; i++) {
     averageSensor[i] = (sensorMax[i] + sensorMin[i]) * 0.5;
   }
 
-  // Tampilkan nilai rata-rata sensor
+  // Display the average value of the sensor
   for (int i = 0; i < 6; i++) {
-    Serial.print("Sensor ke - ");
+    Serial.print("Sensor - ");
     Serial.print(i + 1);
     Serial.print("\t");
     Serial.println(averageSensor[i]);
   }
 
-  // Bersihkan nilai maks dan min sensor untuk kalibrasi berikutnya
+  // Clear sensor max and min values for next calibration
   // for (int i = 0; i < 6; i++) {
   //   sensorMax[i] = 0;
   //   sensorMin[i] = 1023;
@@ -154,63 +170,54 @@ void setup() {
 }
 
 void loop() {
-  readSensors();
-  errorValue = detectLine();
-  if (errorValue == 0) {
-    maju(40, 40);
-    // Serial.println("Majuuuuuu");
-  } else if (errorValue == 1) {
-    maju(40, 40 - 15 * 1);
-    // Serial.println("kanan Dikit");
-  } else if (errorValue == 2 || errorValue == 3) {
-    maju(40, 40 - 15 * 2);
-    // Serial.println("kanan");
-  } else if (errorValue == -1) {
-    maju(40 - 15 * 1, 40);
-    // Serial.println("kiri Dikit");
-  } else if (errorValue == -2 || errorValue == -3) {
-    maju(40 - 15 * 2, 40);
-    // Serial.println("kiri");
-  }
-  if (errorValue == 4) {
-    // maju(5, 5);
-    // while (true) {
-    // readSensors();
-    maju(150, 0);
-    // if (errorValue != 4 or errorValue != 5) {
-    //   break;
-    // }
-    // }
-    // Serial.println("kanan bgt");
-  } else if (errorValue == 5) {
-    maju(150, 0);
+
+  // ReadSensors();
+  // errorValue = DetectLine();
+  // calculatePD();
+  // Serial.println(errorValue);
+  // LineFollowing();
+
+  while (!detect) {
+    Serial.println("LF");
+    ReadSensors();
+    errorValue = DetectLine();
+    // Serial.println(errorValue);
+    // calculatePD();
+    // Serial.println(errorValue);
+    LineFollowing();
+    distance = getDistance();
+
+    if (distance <= 10 && distance != 0) {
+      detect = true;
+      Serial.println("Detecting");
+      break;
+    }
   }
 
-  // Serial.println("kanan bgt");
-  if (errorValue == -4) {
-    // maju(5, 5);
-    // while (true) {
-    //   readSensors();
-    maju(0, 150);
-    // if (errorValue != 4 or errorValue != 5) {
+  Stop();
+  delay(1000);
+  lifting.write(0);
+  delay(1000);
+
+  detect = false;
+
+  while (!detect) {
+    Serial.println("LF");
+    ReadSensors();
+    errorValue = DetectLine();
+    // Serial.println(errorValue);
+    // calculatePD();
+    // Serial.println(errorValue);
+    LineFollowing();
+    // distance = getDistance();
+
+    // if (distance <= 10 && distance != 0) {
+    //   detect = true;
+    //   Serial.println("Detecting");
     //   break;
     // }
   }
-  else if (errorValue == -5) {
-    maju(0, 200);
-  }
-  // Serial.println("kanan bgt");
 }
-// else if (errorValue == -5) {
-//   maju(0, 200);
-//   // Serial.println("kiri banyakk");
-// }
-// else {
-//   maju(20, 30);
-//   // stop();
-//   // Serial.println("Berhenti");
-// }
-
 
 //  Sensor Array   Error Value
 //  0 0 0 0 0 1         -5
@@ -226,8 +233,46 @@ void loop() {
 //  1 0 0 0 0 0          5
 //  0 0 0 0 0 0          Error
 
-void readSensors() {
-  delay(12);
+float getDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  timing = pulseIn(echoPin, HIGH);
+  return timing * 0.034 * 0.5;
+}
+
+// Add new PD calculation function
+void calculatePD() {
+  // Calculate the derivative (rate of change of error)
+  unsigned long currentTime = millis();
+  float deltaTime = (currentTime - lastTime) * 0.001;  // Convert to seconds
+
+  if (deltaTime > 0) {  // Avoid division by zero
+    derivative = (errorValue - lastError) / deltaTime;
+  } else {
+    derivative = 0;
+  }
+
+  // Calculate motor adjustment using PD formula
+  motorSpeedAdjust = (Kp * errorValue) + (Kd * derivative);
+
+  // Update last values for next iteration
+  lastError = errorValue;
+  lastTime = currentTime;
+
+  // Debug output
+  Serial.print("Error: ");
+  Serial.print(errorValue);
+  Serial.print("\tDerivative: ");
+  Serial.print(derivative);
+  Serial.print("\tAdjustment: ");
+  Serial.println(motorSpeedAdjust);
+}
+
+void ReadSensors() {
+  delay(13);
   for (int i = 0; i < 6; i++) {
     riilSensor[i] = analogRead(sensor[i]);
   }
@@ -261,7 +306,7 @@ void readSensors() {
   // Tentukan Nilai Error
 }
 
-int detectLine() {
+int DetectLine() {
   if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 0) && (outputSensor[3] == 0) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
     return 0;  //  1 1 0 0 1 1  Error Value = 0
   } else if ((outputSensor[0] == 1) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 0) && (outputSensor[5] == 1)) {
@@ -288,4 +333,149 @@ int detectLine() {
   // else {
   //   return 10;  // Stop
   // }
+}
+
+void LineFollowing() {
+  // Normal line following
+
+  /*
+  if (errorValue >= -3 && errorValue <= 3) {
+    int leftSpeed = baseSpeed - motorSpeedAdjust;
+    int rightSpeed = baseSpeed + motorSpeedAdjust;
+    Forward(leftSpeed, rightSpeed);
+  }
+  */
+
+  /*
+  if (errorValue == 0) {
+    Forward(baseSpeed, baseSpeed);
+  } else if (errorValue == 1) {
+    Forward(baseSpeed - Kp, baseSpeed);
+  } else if (errorValue == 2) {
+    Forward(baseSpeed - 2 * Kp, baseSpeed);
+  } else if (errorValue == 3) {
+    Forward(baseSpeed - 3 * Kp, baseSpeed);
+  } else if (errorValue == 1) {
+    Forward(baseSpeed, baseSpeed - Kp);
+  } else if (errorValue == 2) {
+    Forward(baseSpeed, baseSpeed - 2 * Kp);
+  } else if (errorValue == 3) {
+    Forward(baseSpeed, baseSpeed - 3 * Kp);
+  }
+  */
+
+  if (errorValue == 0) {
+    Forward(baseSpeed, baseSpeed);
+  } else if (errorValue == 1) {
+    Forward(baseSpeed + 15, baseSpeed - 15);
+  } else if (errorValue == 2) {
+    Forward(baseSpeed + 30, baseSpeed - 30);
+  } else if (errorValue == -1) {
+    Forward(baseSpeed - 15, baseSpeed + 15);
+  } else if (errorValue == -2) {
+    Forward(baseSpeed - 30, baseSpeed + 30);
+  }
+  if (errorValue == 3) {
+    Forward(5, 5);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(150, 0);
+      // delay(100);
+      if (errorValue <= 0) {
+        break;
+      }
+    }
+  }
+  if (errorValue == 4) {
+    Forward(5, 5);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(200, 0);
+      // delay(100);
+      if (errorValue <= 0) {
+        break;
+      }
+    }
+  }
+  if (errorValue == 5) {
+    Forward(5, 5);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(255, 0);
+      // delay(100);
+      if (errorValue <= 0) {
+        break;
+      }
+    }
+  }
+
+  /*
+  else if (errorValue == 5) {
+    Forward(10, 10);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(150, 0);
+      // delay(100);
+      if (errorValue <= 1) {
+        break;
+      }
+    }
+  }
+  */
+
+  if (errorValue == -3) {
+    Forward(5, 5);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(0, 150);
+      // delay(100);
+      if (errorValue >= 0) {
+        break;
+      }
+    }
+  }
+  if (errorValue == -4) {
+    Forward(5, 5);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(0, 200);
+      // delay(100);
+      if (errorValue >= 0) {
+        break;
+      }
+    }
+  }
+  if (errorValue == -5) {
+    Forward(5, 5);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(0, 255);
+      // delay(100);
+      if (errorValue >= 0) {
+        break;
+      }
+    }
+  }
+
+  /*
+  else if (errorValue == -5) {
+    Forward(20, 20);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(0, 150);
+      // delay(100);
+      if (errorValue >= -1) {
+        break;
+      }
+    }
+  }
+  */
 }
