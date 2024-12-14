@@ -1,14 +1,15 @@
 #include <Servo.h>
 
-Servo lifting;
+Servo lifting1;
+Servo lifting2;
 
 // Left Motor (Motor A) pin definitions
-#define pwmA 9  // PWM speed control pin for left motor
+#define pwmA 5  // PWM speed control pin for left motor
 #define in1A 8  // Direction control pin 1 for left motor
 #define in2A 7  // Direction control pin 2 for left motor
 
 // Right Motor (Motor B) pin definitions
-#define pwmB 10  // PWM speed control pin for right motor
+#define pwmB 3   // PWM speed control pin for right motor
 #define in1B 12  // Direction control pin 1 for right motor
 #define in2B 11  // Direction control pin 2 for right motor
 
@@ -17,10 +18,11 @@ int MotorSpeed1 = 0;  // Current speed for motor 1
 int MotorSpeed2 = 0;  // Current speed for motor 2
 
 // Servo motor pin definition
-#define servoPin 5  // Control pin for servo motor
+#define servo1Pin 4  // Control pin for servo motor
+#define servo2Pin 4  // COntrol pin for servo motor
 
 // Ultrasonic sensor pins and variables
-#define trigPin 3    // Trigger pin for ultrasonic sensor
+#define trigPin 6    // Trigger pin for ultrasonic sensor
 #define echoPin 2    // Echo pin for ultrasonic sensor
 float timing = 0.0;  // Store pulse duration
 float distance;      // Store calculated distance
@@ -37,6 +39,7 @@ unsigned long lastTime = 0;  // Timestamp for derivative calculation
 int motorSpeedAdjust = 0;    // Value to adjust motor speeds for correction
 
 bool detect = false;  // Detection flag
+bool detect2 = false;
 
 // Error tracking
 int errorValue = 0;  // Current error value for PD control
@@ -108,8 +111,12 @@ void setup() {
   Serial.begin(9600);
 
   // Setup servo motor for lifting mechanism
-  lifting.attach(servoPin);
+  lifting1.attach(servo1Pin);
+  lifting2.attach(servo2Pin);
   // lifting.writeMicroseconds(1500);
+
+  lifting1.write(90);
+  lifting2.write(90);
 
   // Setup ultrasonic sensor pins
   pinMode(trigPin, OUTPUT);
@@ -128,6 +135,10 @@ void setup() {
 
   // Calibration process
   int sensorValue[6] = { 0, 0, 0, 0, 0, 0 };
+
+
+
+  // /*
 
   // Calibration start sign
   Serial.println("Calibrating...");
@@ -155,18 +166,20 @@ void setup() {
   }
 
   // Display the average value of the sensor
-  for (int i = 0; i < 6; i++) {
-    Serial.print("Sensor - ");
-    Serial.print(i + 1);
-    Serial.print("\t");
-    Serial.println(averageSensor[i]);
-  }
+  // for (int i = 0; i < 6; i++) {
+  //   Serial.print("Sensor - ");
+  //   Serial.print(i + 1);
+  //   Serial.print("\t");
+  //   Serial.println(averageSensor[i]);
+  // }
 
   // Clear sensor max and min values for next calibration
   // for (int i = 0; i < 6; i++) {
   //   sensorMax[i] = 0;
   //   sensorMin[i] = 1023;
   // }
+
+  // */
 }
 
 void loop() {
@@ -178,7 +191,7 @@ void loop() {
   // LineFollowing();
 
   while (!detect) {
-    Serial.println("LF");
+    // Serial.println("LF1");
     ReadSensors();
     errorValue = DetectLine();
     // Serial.println(errorValue);
@@ -189,20 +202,40 @@ void loop() {
 
     if (distance <= 10 && distance != 0) {
       detect = true;
-      Serial.println("Detecting");
+      // detect2 = true;
+      // Serial.println("DETECTING");
       break;
     }
   }
 
-  Stop();
-  delay(1000);
-  lifting.write(0);
+  unsigned long startTime = millis();  // Store the starting time
+
+  while (detect) {
+    unsigned long timeObjectLifting = millis();
+    ReadSensors();
+    errorValue = DetectLine();
+    LineFollowing();
+    // Serial.println("LF2");
+    unsigned long currentTime = millis();
+    if (currentTime - startTime > 3000) {  // Check if 1 seconds have passed
+      // Serial.println("LF2 FINISH");
+      detect = false;
+      break;  // Exit the loop
+    }
+  }
+
+  Forward(0, 0);
+  // delay(2000);
+  // Stop();
+  delay(2000);
+  lifting1.write(0);
+  lifting2.write(0);
   delay(1000);
 
-  detect = false;
+  detect = true;
 
-  while (!detect) {
-    Serial.println("LF");
+  while (detect) {
+    // Serial.println("LF3");
     ReadSensors();
     errorValue = DetectLine();
     // Serial.println(errorValue);
@@ -219,6 +252,14 @@ void loop() {
   }
 }
 
+// void loop() {
+//   lifting1.write(90);
+//   lifting2.write(90);
+//   delay(1000);
+//   lifting1.write(0);
+//   lifting2.write(90);
+//   delay(1000);
+// }
 //  Sensor Array   Error Value
 //  0 0 0 0 0 1         -5
 //  0 0 0 0 1 1         -4
@@ -237,39 +278,39 @@ float getDistance() {
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
+  delayMicroseconds(2);
   digitalWrite(trigPin, LOW);
   timing = pulseIn(echoPin, HIGH);
   return timing * 0.034 * 0.5;
 }
 
 // Add new PD calculation function
-void calculatePD() {
-  // Calculate the derivative (rate of change of error)
-  unsigned long currentTime = millis();
-  float deltaTime = (currentTime - lastTime) * 0.001;  // Convert to seconds
+// void calculatePD() {
+//   // Calculate the derivative (rate of change of error)
+//   unsigned long currentTime = millis();
+//   float deltaTime = (currentTime - lastTime) * 0.001;  // Convert to seconds
 
-  if (deltaTime > 0) {  // Avoid division by zero
-    derivative = (errorValue - lastError) / deltaTime;
-  } else {
-    derivative = 0;
-  }
+//   if (deltaTime > 0) {  // Avoid division by zero
+//     derivative = (errorValue - lastError) / deltaTime;
+//   } else {
+//     derivative = 0;
+//   }
 
-  // Calculate motor adjustment using PD formula
-  motorSpeedAdjust = (Kp * errorValue) + (Kd * derivative);
+//   // Calculate motor adjustment using PD formula
+//   motorSpeedAdjust = (Kp * errorValue) + (Kd * derivative);
 
-  // Update last values for next iteration
-  lastError = errorValue;
-  lastTime = currentTime;
+//   // Update last values for next iteration
+//   lastError = errorValue;
+//   lastTime = currentTime;
 
-  // Debug output
-  Serial.print("Error: ");
-  Serial.print(errorValue);
-  Serial.print("\tDerivative: ");
-  Serial.print(derivative);
-  Serial.print("\tAdjustment: ");
-  Serial.println(motorSpeedAdjust);
-}
+//   // Debug output
+//   Serial.print("Error: ");
+//   Serial.print(errorValue);
+//   Serial.print("\tDerivative: ");
+//   Serial.print(derivative);
+//   Serial.print("\tAdjustment: ");
+//   Serial.println(motorSpeedAdjust);
+// }
 
 void ReadSensors() {
   delay(13);
@@ -280,7 +321,8 @@ void ReadSensors() {
   for (int i = 0; i < 6; i++) {
     if (riilSensor[i] >= (averageSensor[i])) {
       outputSensor[i] = 0;
-    } else if (riilSensor[i] < (averageSensor[i])) {
+    }
+    if (riilSensor[i] < (averageSensor[i])) {
       outputSensor[i] = 1;
     }
   }
@@ -367,115 +409,82 @@ void LineFollowing() {
   if (errorValue == 0) {
     Forward(baseSpeed, baseSpeed);
   } else if (errorValue == 1) {
-    Forward(baseSpeed + 15, baseSpeed - 15);
+    Forward(baseSpeed + 10, baseSpeed - 10);
   } else if (errorValue == 2) {
-    Forward(baseSpeed + 30, baseSpeed - 30);
+    Forward(baseSpeed + 20, baseSpeed - 20);
   } else if (errorValue == -1) {
-    Forward(baseSpeed - 15, baseSpeed + 15);
+    Forward(baseSpeed - 10, baseSpeed + 10);
   } else if (errorValue == -2) {
-    Forward(baseSpeed - 30, baseSpeed + 30);
+    Forward(baseSpeed - 20, baseSpeed + 20);
   }
   if (errorValue == 3) {
-    Forward(5, 5);
-    while (true) {
-      ReadSensors();
-      errorValue = DetectLine();
-      Forward(150, 0);
-      // delay(100);
-      if (errorValue <= 0) {
-        break;
-      }
-    }
-  }
-  if (errorValue == 4) {
-    Forward(5, 5);
-    while (true) {
-      ReadSensors();
-      errorValue = DetectLine();
-      Forward(200, 0);
-      // delay(100);
-      if (errorValue <= 0) {
-        break;
-      }
-    }
-  }
-  if (errorValue == 5) {
-    Forward(5, 5);
-    while (true) {
-      ReadSensors();
-      errorValue = DetectLine();
-      Forward(255, 0);
-      // delay(100);
-      if (errorValue <= 0) {
-        break;
-      }
-    }
-  }
-
-  /*
-  else if (errorValue == 5) {
     Forward(10, 10);
     while (true) {
       ReadSensors();
       errorValue = DetectLine();
-      Forward(150, 0);
+      Forward(baseSpeed + 35, 0);
       // delay(100);
-      if (errorValue <= 1) {
+      if (errorValue <= 0) {
+        break;
+      }
+    }
+  } else if (errorValue == 4) {
+    Forward(10, 10);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(baseSpeed + 45, 0);
+      // delay(100);
+      if (errorValue <= 0) {
+        break;
+      }
+    }
+  } else if (errorValue == 5) {
+    Forward(10, 10);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(baseSpeed + 55, 0);
+      // delay(100);
+      if (errorValue <= 0) {
         break;
       }
     }
   }
-  */
+
 
   if (errorValue == -3) {
-    Forward(5, 5);
+    Forward(10, 10);
     while (true) {
       ReadSensors();
       errorValue = DetectLine();
-      Forward(0, 150);
+      Forward(0, baseSpeed + 45);
+      // delay(100);
+      if (errorValue >= 0) {
+        break;
+      }
+    }
+  } else if (errorValue == -4) {
+    Forward(10, 10);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(0, baseSpeed + 55);
+      // delay(100);
+      if (errorValue >= 0) {
+        break;
+      }
+    }
+  } else if (errorValue == -5) {
+    Forward(10, 10);
+    while (true) {
+      ReadSensors();
+      errorValue = DetectLine();
+      Forward(0, baseSpeed + 65);
       // delay(100);
       if (errorValue >= 0) {
         break;
       }
     }
   }
-  if (errorValue == -4) {
-    Forward(5, 5);
-    while (true) {
-      ReadSensors();
-      errorValue = DetectLine();
-      Forward(0, 200);
-      // delay(100);
-      if (errorValue >= 0) {
-        break;
-      }
-    }
-  }
-  if (errorValue == -5) {
-    Forward(5, 5);
-    while (true) {
-      ReadSensors();
-      errorValue = DetectLine();
-      Forward(0, 255);
-      // delay(100);
-      if (errorValue >= 0) {
-        break;
-      }
-    }
-  }
-
-  /*
-  else if (errorValue == -5) {
-    Forward(20, 20);
-    while (true) {
-      ReadSensors();
-      errorValue = DetectLine();
-      Forward(0, 150);
-      // delay(100);
-      if (errorValue >= -1) {
-        break;
-      }
-    }
-  }
-  */
 }
