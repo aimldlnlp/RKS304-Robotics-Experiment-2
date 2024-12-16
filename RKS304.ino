@@ -17,6 +17,9 @@ Servo lifting2;
 int MotorSpeed1 = 0;  // Current speed for motor 1
 int MotorSpeed2 = 0;  // Current speed for motor 2
 
+int leftSpeed = 0;
+int rightSpeed = 0;
+
 // Servo motor pin definition
 #define servo1Pin 4  // Control pin for servo motor
 #define servo2Pin 4  // COntrol pin for servo motor
@@ -28,15 +31,15 @@ float timing = 0.0;  // Store pulse duration
 float distance;      // Store calculated distance
 
 // Line following parameters
-int baseSpeed = 50;  // Base motor speed for straight line movement
+int baseSpeed = 60;  // Base motor speed for straight line movement
 
 // PD (Proportional-Derivative) Controller Variables
-int Kp = 15;                 // Proportional gain - controls immediate response to error
-float Kd = 0.1;              // Derivative gain - reduces oscillation
-int lastError = 0;           // Stores previous error for derivative calculation
-int derivative = 0;          // Stores rate of change of error
-unsigned long lastTime = 0;  // Timestamp for derivative calculation
-int motorSpeedAdjust = 0;    // Value to adjust motor speeds for correction
+// int Kp = 15;                 // Proportional gain - controls immediate response to error
+// float Kd = 0.1;              // Derivative gain - reduces oscillation
+// int lastError = 0;           // Stores previous error for derivative calculation
+// int derivative = 0;          // Stores rate of change of error
+// unsigned long lastTime = 0;  // Timestamp for derivative calculation
+// int motorSpeedAdjust = 0;    // Value to adjust motor speeds for correction
 
 bool detect = false;  // Detection flag
 bool detect2 = false;
@@ -75,8 +78,8 @@ void Speed(int a, int b) {
   // int spdb = (b / 100 * 255);
 
   // Ensure speed values are within valid PWM range (0-255)
-  a = constrain(a, 0, 255);
-  b = constrain(b, 0, 255);
+  // a = constrain(a, 0, 255);
+  // b = constrain(b, 0, 255);
 
   // Apply PWM signals to control motor speeds
   analogWrite(pwmA, a);  // Set speed for motor A
@@ -144,7 +147,7 @@ void setup() {
   Serial.println("Calibrating...");
 
   unsigned long timeStartCalibration = millis();
-  while (millis() - timeStartCalibration < 5000) {
+  while (millis() - timeStartCalibration < 7000) {
     for (int i = 0; i < 6; i++) {
       sensorValue[i] = analogRead(sensor[i]);
 
@@ -191,13 +194,8 @@ void loop() {
   // LineFollowing();
 
   while (!detect) {
-    // Serial.println("LF1");
-    ReadSensors();
-    errorValue = DetectLine();
-    // Serial.println(errorValue);
-    // calculatePD();
-    // Serial.println(errorValue);
-    LineFollowing();
+    PDLineFollowing();
+    // LineFollowing();
     distance = getDistance();
 
     if (distance <= 10 && distance != 0) {
@@ -212,12 +210,11 @@ void loop() {
 
   while (detect) {
     unsigned long timeObjectLifting = millis();
-    ReadSensors();
-    errorValue = DetectLine();
-    LineFollowing();
+    PDLineFollowing();
+    // LineFollowing();
     // Serial.println("LF2");
     unsigned long currentTime = millis();
-    if (currentTime - startTime > 3000) {  // Check if 1 seconds have passed
+    if (currentTime - startTime > 500) {  // Check if 1 seconds have passed
       // Serial.println("LF2 FINISH");
       detect = false;
       break;  // Exit the loop
@@ -235,13 +232,8 @@ void loop() {
   detect = true;
 
   while (detect) {
-    // Serial.println("LF3");
-    ReadSensors();
-    errorValue = DetectLine();
-    // Serial.println(errorValue);
-    // calculatePD();
-    // Serial.println(errorValue);
-    LineFollowing();
+    PDLineFollowing();
+    // LineFollowing();
     // distance = getDistance();
 
     // if (distance <= 10 && distance != 0) {
@@ -371,120 +363,151 @@ int DetectLine() {
     return 4;  //  0 0 1 1 1 1          4
   } else if ((outputSensor[0] == 0) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
     return 5;  //  0 1 1 1 1 1          5
+  } else {
+    return 10;  // Stop
   }
-  // else {
-  //   return 10;  // Stop
-  // }
 }
 
 void LineFollowing() {
-  // Normal line following
-
-  /*
-  if (errorValue >= -3 && errorValue <= 3) {
-    int leftSpeed = baseSpeed - motorSpeedAdjust;
-    int rightSpeed = baseSpeed + motorSpeedAdjust;
-    Forward(leftSpeed, rightSpeed);
-  }
-  */
-
-  /*
   if (errorValue == 0) {
     Forward(baseSpeed, baseSpeed);
-  } else if (errorValue == 1) {
-    Forward(baseSpeed - Kp, baseSpeed);
-  } else if (errorValue == 2) {
-    Forward(baseSpeed - 2 * Kp, baseSpeed);
-  } else if (errorValue == 3) {
-    Forward(baseSpeed - 3 * Kp, baseSpeed);
-  } else if (errorValue == 1) {
-    Forward(baseSpeed, baseSpeed - Kp);
-  } else if (errorValue == 2) {
-    Forward(baseSpeed, baseSpeed - 2 * Kp);
-  } else if (errorValue == 3) {
-    Forward(baseSpeed, baseSpeed - 3 * Kp);
-  }
-  */
-
-  if (errorValue == 0) {
-    Forward(baseSpeed, baseSpeed);
+    // Serial.println("Tengah");
   } else if (errorValue == 1) {
     Forward(baseSpeed + 10, baseSpeed - 10);
+    // Serial.println("Kanan dikit");
   } else if (errorValue == 2) {
-    Forward(baseSpeed + 20, baseSpeed - 20);
+    Forward(baseSpeed + 15, baseSpeed - 15);
+    // Serial.println("Knan sedang");
   } else if (errorValue == -1) {
     Forward(baseSpeed - 10, baseSpeed + 10);
+    // Serial.println("Kiri dikit");
   } else if (errorValue == -2) {
-    Forward(baseSpeed - 20, baseSpeed + 20);
+    Forward(baseSpeed - 15, baseSpeed + 15);
+    // Serial.println("Kiri sedang");
   }
   if (errorValue == 3) {
-    Forward(10, 10);
+    Forward(7, 7);
     while (true) {
+      // Serial.println("Kanan lumayan");
       ReadSensors();
       errorValue = DetectLine();
-      Forward(baseSpeed + 35, 0);
+      Forward(150, 0);
       // delay(100);
       if (errorValue <= 0) {
         break;
       }
     }
   } else if (errorValue == 4) {
-    Forward(10, 10);
+    Forward(7, 7);
     while (true) {
+      // Serial.println("Kanan kenceng");
       ReadSensors();
       errorValue = DetectLine();
-      Forward(baseSpeed + 45, 0);
+      Forward(200, 0);
       // delay(100);
       if (errorValue <= 0) {
         break;
       }
     }
   } else if (errorValue == 5) {
-    Forward(10, 10);
+    Forward(7, 7);
     while (true) {
+      // Serial.println("Kanan kenceng bgt");
       ReadSensors();
       errorValue = DetectLine();
-      Forward(baseSpeed + 55, 0);
+      Forward(255, 0);
       // delay(100);
       if (errorValue <= 0) {
         break;
       }
     }
   }
-
-
   if (errorValue == -3) {
-    Forward(10, 10);
+    Forward(7, 7);
     while (true) {
+      // Serial.println("Kiri lumayan");
       ReadSensors();
       errorValue = DetectLine();
-      Forward(0, baseSpeed + 45);
+      Forward(0, 150);
       // delay(100);
       if (errorValue >= 0) {
         break;
       }
     }
   } else if (errorValue == -4) {
-    Forward(10, 10);
+    Forward(7, 7);
     while (true) {
+      // Serial.println("Kiri kencneg");
       ReadSensors();
       errorValue = DetectLine();
-      Forward(0, baseSpeed + 55);
+      Forward(0, 200);
       // delay(100);
       if (errorValue >= 0) {
         break;
       }
     }
   } else if (errorValue == -5) {
-    Forward(10, 10);
+    Forward(7, 7);
     while (true) {
+      // Serial.println("Kiri kenceng bgt");
       ReadSensors();
       errorValue = DetectLine();
-      Forward(0, baseSpeed + 65);
+      Forward(0, 255);
       // delay(100);
       if (errorValue >= 0) {
         break;
       }
     }
   }
+}
+
+void PDLineFollowing() {
+  ReadSensors();
+  static int lastError = 0;         // Stores the error from the previous step
+  int currentError = DetectLine();  // Current error value calculated from sensors
+  // if (currentError == 10) {
+  //   digitalWrite(in1A, LOW);
+  //   digitalWrite(in2A, HIGH);
+
+  //   // Set motor B direction pins for forward motion
+  //   digitalWrite(in1B, LOW);
+  //   digitalWrite(in2B, HIGH);
+
+  //   Speed(60, 60);
+  // }
+  // PD Control Parameters
+  const float Kp = 35.0;  // Proportional gain
+  const float Kd = 1.0;   // Derivative gain
+
+  // Compute the proportional and derivative terms
+  int proportional = currentError;
+  int derivative = currentError - lastError;
+
+  // Calculate the control signal
+  float controlSignal = (Kp * proportional) + (Kd * derivative);
+
+  // Compute motor speeds
+  leftSpeed = baseSpeed + controlSignal;
+  rightSpeed = baseSpeed - controlSignal;
+
+  // Constrain the motor speeds to valid ranges (e.g., 0 to 255)
+  // leftSpeed = constrain(leftSpeed, 0, 200);
+  // rightSpeed = constrain(rightSpeed, 0, 200);
+
+  if (leftSpeed < 0) {
+    leftSpeed = 0;
+  } else if (leftSpeed > 255) {
+    leftSpeed = 255;
+  }
+  if (rightSpeed < 0) {
+    rightSpeed = 0;
+  } else if (rightSpeed > 255) {
+    rightSpeed = 255;
+  }
+
+  // Drive the motors with the calculated speeds
+  Forward(leftSpeed, rightSpeed);
+
+  // Update the last error for the next iteration
+  lastError = currentError;
 }
