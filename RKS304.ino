@@ -86,6 +86,7 @@ void Speed(int a, int b) {
   analogWrite(pwmB, b);  // Set speed for motor B
 }
 
+
 // Makes the robot move forward at specified speeds
 void Forward(int a, int b) {
   // Set motor A direction pins for forward motion
@@ -118,8 +119,8 @@ void setup() {
   lifting2.attach(servo2Pin);
   // lifting.writeMicroseconds(1500);
 
-  lifting1.write(90);
-  lifting2.write(90);
+  lifting1.write(180);
+  lifting2.write(180);
 
   // Setup ultrasonic sensor pins
   pinMode(trigPin, OUTPUT);
@@ -214,7 +215,7 @@ void loop() {
     // LineFollowing();
     // Serial.println("LF2");
     unsigned long currentTime = millis();
-    if (currentTime - startTime > 500) {  // Check if 1 seconds have passed
+    if (currentTime - startTime > 1100) {  // Check if 1 seconds have passed
       // Serial.println("LF2 FINISH");
       detect = false;
       break;  // Exit the loop
@@ -225,8 +226,8 @@ void loop() {
   // delay(2000);
   // Stop();
   delay(2000);
-  lifting1.write(0);
-  lifting2.write(0);
+  lifting1.write(90);
+  lifting2.write(90);
   delay(1000);
 
   detect = true;
@@ -236,11 +237,36 @@ void loop() {
     // LineFollowing();
     // distance = getDistance();
 
-    // if (distance <= 10 && distance != 0) {
-    //   detect = true;
-    //   Serial.println("Detecting");
-    //   break;
-    // }
+    if ((outputSensor[0] == 0) && (outputSensor[1] == 0) && (outputSensor[2] == 0) && (outputSensor[3] == 0) && (outputSensor[4] == 0) && (outputSensor[5] == 0)) {
+      detect = false;
+      // Serial.println("Detecting");
+      break;
+    }
+  }
+
+  Forward(0, 0);
+  // delay(2000);
+  // Stop();
+  delay(2000);
+  lifting1.write(180);
+  lifting2.write(180);
+  delay(1000);
+
+  digitalWrite(in1A, LOW);
+  digitalWrite(in2A, HIGH);
+
+  // Set motor B direction pins for forward motion
+  digitalWrite(in1B, LOW);
+  digitalWrite(in2B, HIGH);
+
+  Speed(70, 70);
+
+  delay(1000);
+
+  detect = true;
+
+  while (detect) {
+    Forward(0, 0);
   }
 }
 
@@ -282,7 +308,7 @@ float getDistance() {
 //   unsigned long currentTime = millis();
 //   float deltaTime = (currentTime - lastTime) * 0.001;  // Convert to seconds
 
-//   if (deltaTime > 0) {  // Avoid division by zero
+//   if (deltaTime > 0) {  // Avoid division by zero 
 //     derivative = (errorValue - lastError) / deltaTime;
 //   } else {
 //     derivative = 0;
@@ -363,9 +389,10 @@ int DetectLine() {
     return 4;  //  0 0 1 1 1 1          4
   } else if ((outputSensor[0] == 0) && (outputSensor[1] == 1) && (outputSensor[2] == 1) && (outputSensor[3] == 1) && (outputSensor[4] == 1) && (outputSensor[5] == 1)) {
     return 5;  //  0 1 1 1 1 1          5
-  } else {
-    return 10;  // Stop
   }
+  // else {
+  //   return 10;  // Stop
+  // }
 }
 
 void LineFollowing() {
